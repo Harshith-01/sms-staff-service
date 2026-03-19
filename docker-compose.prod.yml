@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  staff-service:
+    image: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG:-latest}
+    container_name: staff-service
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      SERVICE_NAME: ${SERVICE_NAME:-staff-service}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      INTERNAL_SERVICE_NAME: ${INTERNAL_SERVICE_NAME:-staff-service}
+      INTERNAL_ALLOWED_SERVICES: ${INTERNAL_ALLOWED_SERVICES}
+      ATTENDANCE_SERVICE_URL: ${ATTENDANCE_SERVICE_URL:-http://attendance-service:8000}
+    ports:
+      - "8008:8000"
+    networks:
+      - school-network
+
+networks:
+  school-network:
+    external: true

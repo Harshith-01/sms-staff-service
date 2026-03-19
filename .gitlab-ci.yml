@@ -1,0 +1,58 @@
+stages:
+  - validate
+  - build
+  - deploy
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+  SERVICE_NAME: "$CI_PROJECT_NAME"
+  DEPLOY_BRANCH: "main"
+  COMPOSE_FILE: "docker-compose.prod.yml"
+
+validate:
+  stage: validate
+  image: python:3.11-slim
+  script:
+    - python --version
+    - if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+    - python -m compileall .
+
+build:
+  stage: build
+  image: docker:24.0.9
+  services:
+    - name: docker:24.0.9-dind
+      command: ["--tls=false"]
+  needs: ["validate"]
+  before_script:
+    - docker info
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" "$CI_REGISTRY_IMAGE:latest"
+        docker push "$CI_REGISTRY_IMAGE:latest"
+      fi
+
+deploy:
+  stage: deploy
+  image: alpine:3.20
+  needs: ["build"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  before_script:
+    - apk add --no-cache openssh-client bash
+    - eval "$(ssh-agent -s)"
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - |
+      REMOTE_PROJECT_DIR="${PROJECT_DIR:-/opt/${SERVICE_NAME}}"
+      ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+      "export CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE' IMAGE_TAG='$CI_COMMIT_SHORT_SHA' DEPLOY_BRANCH='${DEPLOY_BRANCH}' PROJECT_DIR='${REMOTE_PROJECT_DIR}' COMPOSE_FILE='${COMPOSE_FILE}' SERVICE_NAME='${SERVICE_NAME}' && bash '${REMOTE_PROJECT_DIR}/ops/deploy.sh'"
