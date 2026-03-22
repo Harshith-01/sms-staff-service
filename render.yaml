@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: sms-staff-service
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: SERVICE_NAME
+        value: staff-service
+      - key: INTERNAL_SERVICE_TOKEN
+        sync: false
+      - key: INTERNAL_SERVICE_NAME
+        value: staff-service
+      - key: INTERNAL_ALLOWED_SERVICES
+        value: sms-service,academic-service,student-service,teacher-service,assessment-service,attendance-service,timetable-attendance-service,auth-service,parent-service,staff-service,fees-service,notification-service
+      - key: ATTENDANCE_SERVICE_URL
+        sync: false
+      - key: FEES_SERVICE_URL
+        sync: false
