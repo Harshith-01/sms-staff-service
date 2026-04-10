@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFil
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
+from core.db_errors import db_integrity_http_exception
 
 from core.database import SessionLocal
 from core.dependencies import require_role
@@ -153,9 +154,9 @@ def create_staff(
         db.commit()
         logger.info(f"Staff created: {staff_id} by {user.get('user_id')}")
         return {"staff_id": staff_id}
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(409, "Duplicate or invalid staff data")
+        raise db_integrity_http_exception(exc, fallback_status=409, fallback_detail="Duplicate or invalid staff data")
     except HTTPException:
         db.rollback()
         raise
@@ -381,9 +382,9 @@ def update_staff(
         )
         db.commit()
         return {"message": "Staff updated successfully"}
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(409, "Update constraint violation")
+        raise db_integrity_http_exception(exc, fallback_status=409, fallback_detail="Update constraint violation")
 
 
 # ============================================================

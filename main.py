@@ -10,8 +10,10 @@ from slowapi.util import get_remote_address
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from api.routes import router
+from core.db_errors import db_integrity_http_exception
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -27,6 +29,12 @@ app.add_exception_handler(
         content={"detail": "Too many requests. Please try again later."},
     ),
 )
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    parsed = db_integrity_http_exception(exc)
+    return JSONResponse(status_code=parsed.status_code, content={"detail": parsed.detail})
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
